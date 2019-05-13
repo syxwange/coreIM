@@ -1,0 +1,115 @@
+DHT protocol:
+        Follows pretty much the principle of the torrent DHT: http://www.bittorrent.org/beps/bep_0005.html (READ IT)
+        几乎遵循了torrent DHT的原则:http://www.bittorrent.org/beps/bep_0005.html
+        But:
+            Vastly simplified packet format.大大简化了包格式。
+            
+        Boostrapping:
+            The first time you install the client we bootstrap it with a node on our servers.(bandwidth should not be a problem as the client only needs to be sent one reply.)
+            第一次安装客户机时，我们用服务器上的节点引导它。(带宽应该不是问题，因为客户机只需要发送一个响应。)
+    
+        Basics (All the numbers here are just guesses and are probably not optimal values):
+        基础(这里的所有数字都只是猜测，可能不是最优值):
+
+
+            client list: A list of node ids closest (mathematically see bittorrent doc) to ours matched with ip addresses + port number corresponding to that id and a timestamp containing the time or time since the client was successfully pinged.
+            客户端列表:最接近我们的节点id列表(数学上参见bittorrent doc)，匹配与该id对应的ip地址+端口号，以及包含客户端成功ping后的时间戳。
+            "friends" list: A list containing the node_ids of all our "friends" or clients we want to connect to.
+                            Also contains the ip addresses + port + node_ids + timestamp(of last ping like in the client list) of the 8 clients closest (mathematically see bittorrent doc) to each "friend"
+            “好友”列表:包含所有要连接到的“好友”或客户机的node_id的列表。
+
+还包含与每个“朋友”最接近的8个客户机的ip地址+ port + node_id +时间戳(在客户机列表中最后一次ping)(数学上参见bittorrent doc)                
+            Two pinged lists: 
+                -One for storing a list of ips along with their ping_ids and a timestamp for the ping requests一个用于存储ip列表及其ping_id和ping请求的时间戳
+                -One for storing a list of ips along with their ping_ids and a timestamp for the get nodes requests一个用于存储ip列表及其ping_id和get节点请求的时间戳
+                Entries in the pinged lists expire after 5 seconds. ping列表中的条目在5秒后过期。
+                If one of the lists becomes full, the expire rate reduces itself one second or the new ping takes the place of the oldest one.
+          
+
+      如果其中一个列表已满，过期率将减少1秒，或者新的ping将取代旧的ping。
+      
+            Entries in client list and "friends" list expire after 300 seconds without ping response.客户端列表和“好友”列表中的条目在没有ping响应的情况下在300秒后过期。
+            Each client stores a maximum of 32 entries in its client list.每个客户端在其客户端列表中最多存储32个条目。
+
+
+            Each client in the client list and "friends" list is pinged every 60 seconds.
+
+客户端列表和“好友”列表中的每个客户端每60秒被ping一次。
+            Each client in the client list and "friends" list has a timestamp which denote the last time it was successfully pinged.
+            客户端列表和“好友”列表中的每个客户端都有一个时间戳，它表示上次成功ping的时间。
+            If the corresponding clients timestamp is more than 130 seconds old it is considered bad.如果对应的客户端时间戳超过130秒，则认为是错误的。
+            Send a get nodes request every 20 seconds to a random good node for each "friend" in our "friends" list.每隔20秒向我们“好友”列表中的每个“好友”的随机好节点发送一个get节点请求。
+            Send a get nodes request every 20 seconds to a random good node in the client list.每隔20秒向客户端列表中的随机好节点发送一个get节点请求。
+            
+
+
+
+
+
+
+
+
+    
+    
+            When a client receives any request from another:当客户端收到其他客户的任何请求时
+              -Respond to the request响应请求
+
+
+                  -Ping request is replied to with with a ping response containing the same ping_id-Ping请求用包含相同ping_id的ping响应来响应
+                  -Get nodes request is replied with a send nodes reply containing the same ping_id and the good nodes from the client list and/or the "friends" list that are closest to the requested_node_id
+                  -Get nodes请求通过一个包含相同ping_id和来自客户机列表和/或“friends”列表中最接近requested_node_id的好节点的send nodes响应
+
+
+              -If the requesting client is not in the client list:-如果提出要求的客户端不在客户端列表中:
+                -If there are no bad clients in the list and the list is full:-如果列表中没有坏客户，且列表已满:
+                        -If the id of the other client is closer (mathematically see bittorrent doc) than at least one of the clients in the list or our "friends" list:
+                        -如果其他客户的id比列表或我们的“好友”列表中的至少一个客户的id更接近(数学上看bittorrent doc):
+                            -Send a ping request to the client.发送一个ping请求给客户端。
+                        -if not forget about the client.如果不忘记客户的话
+    
+                -If there are bad clients and/or the list isn't full:如果有坏客户和/或名单不够:
+                        -Send a ping request to the client 发送一个ping请求给客户端
+
+
+    
+            When a client receives a response:当客户端收到响应时:
+                -Ping response
+                    -If the node was previously pinged with a matching ping_id (check in the corresponding pinged list.)如果节点之前使用匹配的ping_id进行了ping(检查对应的ping列表)。	    
+                        -If the node is in the client list the matching client's timestamp is set to current time.如果节点在客户端列表中，则匹配的客户端时间戳设置为当前时间。
+                        -If the node is in the "friends" list the matching client's timestamp is set to current time for every occurrence.如果节点在“好友”列表中，匹配的客户端时间戳为每次发生的当前时间
+                        -If the node is not in the client list:如果节点不在客户端列表中:
+                            -If the list isn't full, add it to the list.如果列表不满，将其添加到列表中。
+                            -If the list is full, the furthest away (mathematically see bittorrent doc) bad client is replaced by the new one.如果列表是满的，最远的坏客户端(数学上看bittorrent doc)被新客户端取代。
+                            -If the list is filled with good nodes replace the furthest client with it only if it is closer than the replaced node
+		.如果列表中充满了好节点，则仅当最远的客户机比被替换的节点更近时，才用它替换最远的客户机。
+                        -for each friend in the "friends" list:对于“好友”列表中的每个朋友:
+                            -If that friend's client list isn't full, add that client to it如果那个朋友的客户列表还没有满，把那个客户添加进去
+                            -If that friend's client list contains bad clients, replace the furthest one with that client.如果那个朋友的客户列表中有坏客户，用那个客户替换最远的那个。
+                            -If that friend's client list contains only good clients如果那个朋友的客户名单上只有好客户
+                                -If the client is closer to the friend than one of the other clients, it replaces the farthest one如果客户比其他客户离朋友更近，它就会取代最远的客户
+                                -If not, nothing happens.如果没有，什么也不会发生。
+                            
+                -Send nodes发送节点
+                    -If the ping_id matches what we sent previously (check in the corresponding pinged list.):如果ping_id与我们之前发送的相匹配(检查对应的pinged列表):
+                        -Each node in the response is pinged.响应中的每个节点被ping。
+              
+    
+            
+            
+    
+        Protocol:
+    
+            Node format: [char array (node_id), length=32 bytes][ip (in network byte order), length=4 bytes][port (in network byte order), length=2 bytes][Padding , length=2 bytes]
+    
+            Valid queries and Responses:有效查询和响应:
+    
+                Ping(Request and response): [byte with value: 00 for request, 01 for response][random 4 byte (ping_id)][char array (client node_id), length=32 bytes]
+                    ping_id = a random integer, the response must contain the exact same number as the request
+    
+    
+                Get nodes (Request):
+                Packet contents: [byte with value: 02][random 4 byte (ping_id)][char array (client node_id), length=32 bytes][char array: requested_node_id (node_id of which we want the ip), length=32 bytes]
+                Valid replies: a send_nodes packet有效应答:send_nodes包
+    
+                Send_nodes (response): [byte with value: 03][random 4 byte (ping_id)][char array  (client node_id), length=32 bytes][Nodes in node format, length=40 * (number of nodes (maximum of 8 nodes)) bytes]
+                ex: 03[Node][Node][Node] 
