@@ -70,6 +70,7 @@ public slots:
 	bool  onRecieveDhtPacket(QByteArray packet, IP_Port source);
 
 private:
+	//向ipport的机器ID为clientID客户端发送一个getNode请求,返回发送的字节数，不成功返回-1
 	int getNodes(IP_Port ipport, QByteArray clientID);
 
 	//看ipport在m_sendNodesList列表中吗
