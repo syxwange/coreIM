@@ -1,6 +1,4 @@
 #include "CNetwork.h"
-#include <qdatetime.h>
-#include <random>
 #include <qnetworkdatagram.h>
 
 CNetwork::CNetwork(QObject *parent)	: QObject(parent),m_pUdpSocket(new QUdpSocket(this))
@@ -12,18 +10,6 @@ CNetwork::~CNetwork()
 	
 }
 
-int64_t CNetwork::currentTime()
-{
-	return QDateTime::currentDateTime().toMSecsSinceEpoch();	
-}
-
-
-int CNetwork::randomInt()
-{	
-	std::default_random_engine randEngine((std::random_device())());
-	std::uniform_int_distribution<int> distribution;
-	return distribution(randEngine);	
-}
 
 int CNetwork::sendPacket(const QByteArray& msg,const  IP_Port& ipport)
 {

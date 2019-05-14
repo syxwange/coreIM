@@ -21,11 +21,7 @@ public:
 	CNetwork(QObject *parent=nullptr);
 	~CNetwork();
 
-	//返回毫秒级时间戳
-	int64_t  currentTime();
 
-	//返回随便数字
-	int randomInt();
 
 	//发送一个UDP包，返回发送数据的大小
 	int sendPacket(const QByteArray& msg,const IP_Port& ipport);
