@@ -27,34 +27,34 @@ void CDistributedHashTable::doClosest()
 
 void CDistributedHashTable::doFriends()
 {	
-	auto tempTime = CUtil::currentTime();
-	uint32_t numNodes = 0;
-	uint32_t randNode;
-	uint32_t index[MAX_FRIEND_CLIENTS];
+	auto tempTime = CUtil::currentTime();	
+	uint32_t randNode=0;	
 	for (int i = 0; i < m_numFriends; i++)
 	{
-		for (int j = 0; j < MAX_FRIEND_CLIENTS; j++)
+		uint32_t numNodes = 0;
+		for (auto& node : m_friendsList[i].client_list)
 		{
-			if (m_friendsList[i].client_list[j].timestamp + Kill_NODE_TIMEOUT > temp_time)//if node is not dead.
+			//node的timestamp没有超过杀死节点的时间
+			if (tempTime - node.timestamp < Kill_NODE_TIMEOUT * 1000)
 			{
-				if ((m_friendsList[i].client_list[j].last_pinged + PING_INTERVAL) <= temp_time)
+				//node节点的last_pinged超过 ping间隔的时间，每60秒发送一个sendPingRequest请求。
+				if (tempTime - node.last_pinged >= PING_INTERVAL * 1000)
 				{
-					sendPingRequest(m_friendsList[i].client_list[j].ip_port);
-					m_friendsList[i].client_list[j].last_pinged = temp_time;
-				}
-				if (numNodes[i].client_list[j].timestamp + BAD_NODE_TIMEOUT > temp_time)//if node is good.
-				{
-					index[numNodes] = j;
-					numNodes++;
+					sendPingRequest(node.ip_port);
+					node.last_pinged = tempTime;
 				}
 			}
+			if (tempTime - node.timestamp < BAD_NODE_TIMEOUT * 1000)
+			{				
+				numNodes++;
+			}
 		}
-		if (friend_lastgetnode[i] + GET_NODE_INTERVAL <= temp_time && num_nodes != 0)
-		{
-			rand_node = rand() % num_nodes;
-			getnodes(friends_list[i].client_list[index[rand_node]].ip_port,
-				friends_list[i].client_list[index[rand_node]].client_id);
-			friend_lastgetnode[i] = temp_time;
+		//todo :可以合并到m_friendsList结构中。每10秒发送一个sendNodesRequest请求给m_friendLastGetnode中随机的client_list
+		if (m_friendLastGetnode[i] + GET_NODE_INTERVAL*1000 <= tempTime && numNodes != 0)
+		{			
+			randNode =CUtil::randomInt(numNodes);		
+			sendNodesRequest(m_friendsList[i].client_list[randNode].ip_port, m_friendsList[i].client_list[randNode].client_id);
+			m_friendLastGetnode[i] = tempTime;
 		}
 	}
 }
@@ -74,7 +74,7 @@ bool CDistributedHashTable::onNodesRequest(QByteArray packet, IP_Port source)
 		return false;
 	sendNodeResponses(source, packet.replace(5, CLIENT_ID_SIZE), clientID);
 
-	sendPingRequest();
+	sendPingRequest(source);
 	return true;
 }
 
@@ -160,19 +160,39 @@ int CDistributedHashTable::sendNodeResponses(IP_Port ipport, QByteArray clientID
 
 int CDistributedHashTable::sendPingRequest(IP_Port ipport)
 {
-	if (isPinging(ipport, 0))	{
+	if (isPinging(ipport, 0))
 		return 1;
 
-	int ping_id = add_pinging(ip_port);
-	if (ping_id == 0)
-	{
+	int pingID = addPinging(ipport);
+	if (pingID == 0)
 		return 1;
-	}
-	char data[5 + CLIENT_ID_SIZE];
+	//[byte with value: 00 for request, 01 for response][random 4 byte (ping_id)][char array (client node_id), length=32 bytes]
+	//ping_id = a random integer, the response must contain the exact same number as the request
+	QByteArray data(5 + CLIENT_ID_SIZE, 0x00);
 	data[0] = 0;
-	memcpy(data + 1, &ping_id, 4);
-	memcpy(data + 5, self_client_id, CLIENT_ID_SIZE);
-	return sendpacket(ip_port, data, sizeof(data));
+	memcpy(data.data() + 1, &pingID, 4);
+	memcpy(data.data() + 5, m_selfClientID, CLIENT_ID_SIZE);
+	emit sendDhtPacket(data, ipport);
+	return 0;
+}
+
+///当都是有效时间会不会没有添加成功。
+int CDistributedHashTable::addPinging(IP_Port ipport)
+{
+	auto tempTime = CUtil::currentTime();
+	for (int i = 0; i < PING_TIMEOUT; i++)
+	{
+		for (auto& ping : m_pingsList)
+		{
+			if (tempTime - ping.timestamp > (PING_TIMEOUT - i) * 1000)
+			{
+				ping.timestamp = tempTime;
+				ping.ip_port = ipport;
+				ping.ping_id = CUtil::randomInt();
+				return ping.ping_id;
+			}
+		}		
+	}
 	return 0;
 }
 

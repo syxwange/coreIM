@@ -9,6 +9,6 @@ public:
 	static long long  currentTime();
 
 	//·µ»ØËæ±ãÊı×Ö
-	static int randomInt();
+	static int randomInt(int n=0);
 };
 

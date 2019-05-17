@@ -18,9 +18,17 @@ int64_t CUtil::currentTime()
 }
 
 
-int CUtil::randomInt()
+int CUtil::randomInt(int n)
 {
 	std::default_random_engine randEngine((std::random_device())());
-	std::uniform_int_distribution<int> distribution;
-	return distribution(randEngine);
+	if (n == 0)
+	{
+		std::uniform_int_distribution<int> distribution;
+		return distribution(randEngine);
+	}		
+	else
+	{
+		std::uniform_int_distribution<int> distribution(0, n);
+		return distribution(randEngine);
+	}	
 }

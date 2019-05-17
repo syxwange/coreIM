@@ -14,13 +14,18 @@ const int LCLIENT_LIST = 32;// LCLIENT_LENGTH* LCLIENT_NODES;
 const int PING_TIMEOUT = 5;
 const int MAX_SENT_NODES = 8;
 const int BAD_NODE_TIMEOUT = 130;
-
+//The timeout after which a node is discarded completely.节点被完全丢弃的超时。
+const int Kill_NODE_TIMEOUT = 300;
+//ping interval in seconds for each node in our lists.对于列表中的每个节点，ping间隔(以秒为单位)。
+const int PING_INTERVAL = 60;
+//ping interval in seconds for each random sending of a get nodes request.每次随机发送sendNodesRequest请求的ping间隔(以秒为单位)。
+const int  GET_NODE_INTERVAL = 10;
 typedef struct
 {
 	char client_id[CLIENT_ID_SIZE];
 	IP_Port ip_port;
-	uint32_t timestamp;
-	uint32_t last_pinged;
+	int64_t timestamp;
+	int64_t last_pinged;
 }ClientData;
 
 typedef struct
@@ -57,9 +62,11 @@ public:
 	//每秒中doDHT函数运行一定次数（估计30次左右）
 	void doDHT();
 	
-	//每60秒Ping最近节点列表中的每个客户机。每隔20秒向列表中的随机好节点发送一个get节点请求。
+	//每60秒Ping最近节点列表中的每个客户机。每隔20秒向列表中的随机好节点发送一个get节点请求。---doClose
 	void doClosest();
 
+	//每60秒发送一个sendPingRequest请求给m_friendLastGetnode所有有效的client_list。时间不是很精确
+	//每10秒发送一个sendNodesRequest请求给m_friendLastGetnode中随机的client_list
 	void doFriends();
 
 	//从ipport机器的客户端引当前机器导客户端，发送一个 get nodes请求给位于ipport机器的客户端，并把自己ID发送给ipport机器的客户端
@@ -95,7 +102,12 @@ private:
 	int sendNodeResponses(IP_Port ipport,QByteArray clientID,quint32 pingID);
 
 	//发送一个ping请求。---pingreq
+	//[byte with value: 00 for request, 01 for response][random 4 byte (ping_id)][char array (client node_id), length=32 bytes]
+	//ping_id = a random integer, the response must contain the exact same number as the requestping_id =一个随机整数，响应必须包含与请求完全相同的数字
 	int sendPingRequest(IP_Port ipport);
+
+	//增加一个pinged在m_pingsList中  ---add_pinging
+	int addPinging(IP_Port ipport);
 
 	//在m_closeClientlist和m_friendsList的client_list中查找MAX_SENT_NODES（8）个最接近发送NodesRequest请求clientID的节点: ---get_close_nodes
 	//将它们放入nodeList中，并返回找到的数量。TODO:使这个函数更有效。
@@ -109,7 +121,7 @@ private:
 	//问题：为什么是这么 判断？？？？
 	int idClosest(const char* clientId,const char* clientId1,const char* clientId2);
 
-	//ipport和pingID是否在m_pingsList列表中
+	//ipport和pingID是否在m_pingsList列表中 ---is_pinging
 	bool isPinging(IP_Port ipport, uint32_t pingID);
 private:
 	QByteArray m_selfClientID{32, 0x00};
@@ -117,6 +129,7 @@ private:
 
 	Friend m_friendsList[MAX_FRIENDS]{};
 	quint16 m_numFriends = 0;
+	qint64 m_friendLastGetnode[MAX_FRIENDS];
 
 	Pinged m_pingsList[LPING_ARRAY]{};	
 
