@@ -45,6 +45,9 @@
     <ClCompile Include="CUtil.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="CCoreIM.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <QtMoc Include="mainwindow.h">
@@ -54,6 +57,9 @@
       <Filter>Header Files</Filter>
     </QtMoc>
     <QtMoc Include="CDistributedHashTable.h">
+      <Filter>Header Files</Filter>
+    </QtMoc>
+    <QtMoc Include="CCoreIM.h">
       <Filter>Header Files</Filter>
     </QtMoc>
   </ItemGroup>

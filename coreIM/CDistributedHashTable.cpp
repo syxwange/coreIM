@@ -81,15 +81,13 @@ bool CDistributedHashTable::onNodesRequest(QByteArray packet, IP_Port source)
 int CDistributedHashTable::sendNodesRequest(IP_Port ipport, QByteArray clientID)
 {
 	if (isSendNodesRequest(ipport, 0))
-	{
 		return -1;
-	}
+
 	int ping_id = addNodesRequest(ipport);
 
 	if (ping_id == 0)
-	{
 		return -1;
-	}
+
 	QByteArray dataTemp(5 + CLIENT_ID_SIZE * 2, 0x00);	
 	//NodesRequest请求，格式是 [byte with value: 02][random 4 byte (ping_id)][char array (自己的ID), length=32 bytes]
 	//[char array: 目标机客户端ID(node_id of which we want the ip), length=32 bytes]
@@ -144,9 +142,8 @@ int CDistributedHashTable::sendNodeResponses(IP_Port ipport, QByteArray clientID
 	NodeFormat nodesList[MAX_SENT_NODES];
 	int numNodes = getCloseNodes(clientID, nodesList);
 	if (numNodes == 0)
-	{
 		return 0;
-	}
+
 	//Send_nodes (response):发送nodesResponse包格式是 [byte with value: 03][random 4 byte (ping_id)][char array  (client node_id), length=32 bytes]
 	//[Nodes in node format, length=40 * (number of nodes (maximum of 8 nodes)) bytes]
 	dataTemp[0] = 3;
