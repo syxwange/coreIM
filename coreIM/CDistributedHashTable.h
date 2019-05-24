@@ -91,20 +91,20 @@ private:
 	//向ipport的机器ID为clientID客户端发送一个Node请求,成功返回0，不成功返回-1 ---getnodes
 	int sendNodesRequest(IP_Port ipport, QByteArray clientID);
 
-	//看ipport在m_nodesRequestList列表中吗--is_gettingnodes
-	bool isSendNodesRequest(IP_Port ipport, quint32 pingID);
-
-	//把一个新的Nodes请求的ipport添加到m_nodesRequestList中，并创建一个随机pingID----add_gettingnodes
-	//问题：如果都是有效的时间戳m_sendNodesList是满的则没有添加，怎么最优处理？
-	int addNodesRequest(IP_Port ipport);
-
 	//为收到的nodes请求发送一个响应。---sendnodes
-	int sendNodeResponses(IP_Port ipport,QByteArray clientID,quint32 pingID);
+	int sendNodeResponses(IP_Port ipport, QByteArray clientID, quint32 pingID);
 
 	//发送一个ping请求。---pingreq
 	//[byte with value: 00 for request, 01 for response][random 4 byte (ping_id)][char array (client node_id), length=32 bytes]
 	//ping_id = a random integer, the response must contain the exact same number as the requestping_id =一个随机整数，响应必须包含与请求完全相同的数字
 	int sendPingRequest(IP_Port ipport);
+
+	//看ipport在m_nodesRequestList列表中吗--is_gettingnodes
+	bool isSendNodesRequest(IP_Port ipport, quint32 pingID);
+
+	//把一个新的Nodes请求的ipport添加到m_nodesRequestList中，并创建一个随机pingID----add_gettingnodes
+	//问题：如果都是有效的时间戳m_sendNodesList是满的则没有添加，怎么最优处理？
+	int addNodesRequest(IP_Port ipport);	
 
 	//增加一个pinged在m_pingsList中  ---add_pinging
 	int addPinging(IP_Port ipport);
@@ -126,6 +126,7 @@ private:
 private:
 	QByteArray m_selfClientID{32, 0x00};
 	ClientData m_closeClientlist[LCLIENT_LIST];
+	qint64 m_closeLastSendRequest = 0;
 
 	Friend m_friendsList[MAX_FRIENDS]{};
 	quint16 m_numFriends = 0;

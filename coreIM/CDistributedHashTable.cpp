@@ -15,7 +15,7 @@ int CDistributedHashTable::addfriend(QByteArray clientID)
 	return 0;
 }
 
-void CDistributedHashTable::doDHT()
+ 
 {
 	doClosest();
 	doFriends();
@@ -23,6 +23,30 @@ void CDistributedHashTable::doDHT()
 
 void CDistributedHashTable::doClosest()
 {
+	uint32_t i;
+	auto tempTime = CUtil::currentTime();
+	int numNodes = 0;	
+
+	for (auto& node : m_closeClientlist)
+	{
+		if (tempTime - node.timestamp < Kill_NODE_TIMEOUT*1000)//if node is not dead.
+		{
+			if (tempTime - node.last_pinged >= PING_INTERVAL*1000)
+			{
+				sendPingRequest(node.ip_port);
+				node.last_pinged = tempTime;
+			}
+			if (tempTime - node.timestamp < BAD_NODE_TIMEOUT * 1000)
+				numNodes++;
+		}
+	}
+
+	if (m_closeLastSendRequest + GET_NODE_INTERVAL*1000 <= tempTime&& numNodes != 0)
+	{
+		auto n = CUtil::randomInt(numNodes);
+		sendNodesRequest(m_closeClientlist[n].ip_port,QByteArray::fromRawData(m_closeClientlist[n].client_id,32) );
+		m_closeLastSendRequest = tempTime;
+	}
 }
 
 void CDistributedHashTable::doFriends()
@@ -53,7 +77,7 @@ void CDistributedHashTable::doFriends()
 		if (m_friendLastGetnode[i] + GET_NODE_INTERVAL*1000 <= tempTime && numNodes != 0)
 		{			
 			randNode =CUtil::randomInt(numNodes);		
-			sendNodesRequest(m_friendsList[i].client_list[randNode].ip_port, m_friendsList[i].client_list[randNode].client_id);
+			sendNodesRequest(m_friendsList[i].client_list[randNode].ip_port, QByteArray::fromRawData(m_friendsList[i].client_list[randNode].client_id,32));
 			m_friendLastGetnode[i] = tempTime;
 		}
 	}
