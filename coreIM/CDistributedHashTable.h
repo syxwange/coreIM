@@ -57,7 +57,11 @@ public:
 	~CDistributedHashTable();
 
 	//通过过ID添加一个朋友，ID是一个32位的hash值
-	int addfriend(QByteArray clientID);
+	int addFriend(QByteArray clientID);
+
+	int delFriend(char* client_id);
+
+	IP_Port getFriendIP(char* client_id);
 
 	//每秒中doDHT函数运行一定次数（估计30次左右）
 	void doDHT();
@@ -73,10 +77,6 @@ public:
 	void bootstrap(IP_Port ipport);
 
 signals:
-	void pingRequest(QByteArray, IP_Port);
-	void pingResponse(QByteArray, IP_Port);
-	void nodesRequest(QByteArray, IP_Port);
-	void nodesResponses(QByteArray, IP_Port);
 	//发送一个DHT包
 	void sendDhtPacket(QByteArray, IP_Port);
 
@@ -86,6 +86,15 @@ public slots:
 
 	//处理收到nodes请求---handle_getnodes
 	bool onNodesRequest(QByteArray packet, IP_Port source);
+
+	//处理收到nodes响应Responses    ---handle_sendnodes
+	bool onNodesResponses(QByteArray packet, IP_Port source);
+
+	//处理收到ping 请求   ---handle_pingreq
+	bool onPingRequest(QByteArray packet, IP_Port source);
+
+	//处理收到ping 响应Responses   ---handle_pingres
+	bool onPingResponses(QByteArray packet, IP_Port source);
 
 private:
 	//向ipport的机器ID为clientID客户端发送一个Node请求,成功返回0，不成功返回-1 ---getnodes
@@ -99,6 +108,9 @@ private:
 	//ping_id = a random integer, the response must contain the exact same number as the requestping_id =一个随机整数，响应必须包含与请求完全相同的数字
 	int sendPingRequest(IP_Port ipport);
 
+	//发送一个ping 响应 ---pingres
+	int sendPingResoinses(IP_Port ip_port, quint32 ping_id);
+
 	//看ipport在m_nodesRequestList列表中吗--is_gettingnodes
 	bool isSendNodesRequest(IP_Port ipport, quint32 pingID);
 
@@ -109,12 +121,24 @@ private:
 	//增加一个pinged在m_pingsList中  ---add_pinging
 	int addPinging(IP_Port ipport);
 
+	//尝试将带有ip_port和client_id的客户机添加到m_friendsList客户机列表和m_closeClientlist中 ---addto_lists
+	void addtoLists(IP_Port ip_port, char* client_id);
+
 	//在m_closeClientlist和m_friendsList的client_list中查找MAX_SENT_NODES（8）个最接近发送NodesRequest请求clientID的节点: ---get_close_nodes
 	//将它们放入nodeList中，并返回找到的数量。TODO:使这个函数更有效。
 	int getCloseNodes(const QByteArray& clientID, NodeFormat* nodeList);
 
 	//检查长度为lislength列表中是否已包含clientID  ---client_in_nodelist
 	bool clientInNodelist(const NodeFormat* list,const quint32 length,const QByteArray& clientID);
+
+	//检查client_id和ip_port是否在list中
+	bool clientInList(ClientData* list, uint32_t length, char* client_id, IP_Port ip_port);
+
+	// ---replace_bad
+	bool replaceBadNode(ClientData* list, uint32_t length, char* client_id, IP_Port ip_port);//tested
+
+	//---replace_good
+	bool replaceGoodNode(ClientData* list, uint32_t length, char* client_id, IP_Port ip_port, char* comp_client_id);
 
 	//比较clientId，clientId1，clientId2  ----id_closest
 	//返回0都是同样的距离；返回1则clientId1近；返回2则clientId2近
@@ -125,16 +149,14 @@ private:
 	bool isPinging(IP_Port ipport, uint32_t pingID);
 private:
 	QByteArray m_selfClientID{32, 0x00};
-	ClientData m_closeClientlist[LCLIENT_LIST];
+	ClientData m_closeClientlist[LCLIENT_LIST]{};
 	qint64 m_closeLastSendRequest = 0;
 
 	Friend m_friendsList[MAX_FRIENDS]{};
 	quint16 m_numFriends = 0;
-	qint64 m_friendLastGetnode[MAX_FRIENDS];
+	qint64 m_friendLastGetnode[MAX_FRIENDS]{};
 
 	Pinged m_pingsList[LPING_ARRAY]{};	
 
-	Pinged m_nodesRequestList[LSEND_NODES_ARRAY];
-
-	CNetwork m_network{};
+	Pinged m_nodesRequestList[LSEND_NODES_ARRAY]{};
 };

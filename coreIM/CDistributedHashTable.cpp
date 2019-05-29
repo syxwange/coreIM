@@ -3,19 +3,60 @@
 
 CDistributedHashTable::CDistributedHashTable(QObject *parent) : QObject(parent)
 {
-	m_network.initNetwork(QHostAddress(QHostAddress::LocalHost));	
+	
 }
 
 CDistributedHashTable::~CDistributedHashTable()
 {
 }
 
-int CDistributedHashTable::addfriend(QByteArray clientID)
+int CDistributedHashTable::addFriend(QByteArray clientID)
 {
-	return 0;
+	if (MAX_FRIENDS > m_numFriends)
+	{
+		memcpy(m_friendsList[m_numFriends].client_id, clientID, CLIENT_ID_SIZE);
+		m_numFriends++;
+		return 0;
+	}
+	return 1;
 }
 
- 
+int CDistributedHashTable::delFriend(char* client_id)
+{
+	uint32_t i;
+	for (i = 0; i < m_numFriends; i++)
+	{
+		if (memcmp(m_friendsList[i].client_id, client_id, CLIENT_ID_SIZE) == 0)//Equal
+		{
+			m_numFriends--;
+			m_friendsList[i] = m_friendsList[m_numFriends];			
+			m_friendsList[m_numFriends] = {};
+			return 0;
+		}
+	}
+	return 1;
+}
+
+IP_Port CDistributedHashTable::getFriendIP(char* client_id)
+{	
+	IP_Port empty = { };
+
+	for (int i = 0; i < m_numFriends; i++)
+	{
+		if (memcmp(m_friendsList[i].client_id, client_id, CLIENT_ID_SIZE) == 0)//Equal
+		{
+			for (auto& node : m_friendsList[i].client_list)
+			{
+				if (memcmp(node.client_id, client_id, CLIENT_ID_SIZE) == 0)
+					return node.ip_port;
+			}			
+			return empty;
+		}
+	}	
+	return empty;	
+}
+
+void CDistributedHashTable::doDHT()
 {
 	doClosest();
 	doFriends();
@@ -102,6 +143,68 @@ bool CDistributedHashTable::onNodesRequest(QByteArray packet, IP_Port source)
 	return true;
 }
 
+bool CDistributedHashTable::onNodesResponses(QByteArray packet, IP_Port source)
+{
+	if (packet.size() > (5 + CLIENT_ID_SIZE + MAX_SENT_NODES * (CLIENT_ID_SIZE + sizeof(IP_Port))) ||
+		(packet.size() - 5 - CLIENT_ID_SIZE) % (CLIENT_ID_SIZE + sizeof(IP_Port)) != 0)
+	{
+		return false;
+	}
+	uint32_t num_nodes = (packet.size() - 5 - CLIENT_ID_SIZE) / (CLIENT_ID_SIZE + sizeof(IP_Port));
+	uint32_t ping_id;
+
+	memcpy(&ping_id, packet.data() + 1, 4);
+	if (!isSendNodesRequest(source, ping_id))
+		return false;
+
+	NodeFormat nodes_list[MAX_SENT_NODES]{};
+	memcpy(nodes_list, packet.data() + 5 + CLIENT_ID_SIZE, num_nodes * (CLIENT_ID_SIZE + sizeof(IP_Port)));
+
+	for (int i = 0; i < num_nodes; i++)
+	{
+		sendPingRequest(nodes_list[i].ip_port);
+	}
+	addtoLists(source, packet.data() + 5);
+	return true;
+}
+
+////ÓÐÎÊÌâÂð£¿
+bool CDistributedHashTable::onPingRequest(QByteArray packet, IP_Port source)
+{
+	if (packet.size() != 5 + CLIENT_ID_SIZE)
+	{
+		return false;
+	}
+	int ping_id;
+	memcpy(&ping_id, packet.data() + 1, 4);
+	IP_Port bad_ip = {};
+
+	if (isPinging(bad_ip, ping_id))//check if packet is from ourself.
+	{
+		return false;
+	}
+	sendPingResoinses(source, ping_id);
+	sendPingRequest(source);
+	return true;
+}
+
+bool CDistributedHashTable::onPingResponses(QByteArray packet, IP_Port source)
+{
+	if (packet.size() != (5 + CLIENT_ID_SIZE))
+	{
+		return false;
+	}
+	uint32_t ping_id;
+
+	memcpy(&ping_id, packet.data() + 1, 4);
+	if (isPinging(source, ping_id))
+	{
+		addtoLists(source, packet.data() + 5);
+		return true;
+	}
+	return false;
+}
+
 int CDistributedHashTable::sendNodesRequest(IP_Port ipport, QByteArray clientID)
 {
 	if (isSendNodesRequest(ipport, 0))
@@ -163,7 +266,7 @@ int CDistributedHashTable::sendNodeResponses(IP_Port ipport, QByteArray clientID
 {
 	QByteArray dataTemp(5 + CLIENT_ID_SIZE +  sizeof(NodeFormat) * MAX_SENT_NODES, 0x00);
 	
-	NodeFormat nodesList[MAX_SENT_NODES];
+	NodeFormat nodesList[MAX_SENT_NODES]{};
 	int numNodes = getCloseNodes(clientID, nodesList);
 	if (numNodes == 0)
 		return 0;
@@ -192,8 +295,20 @@ int CDistributedHashTable::sendPingRequest(IP_Port ipport)
 	QByteArray data(5 + CLIENT_ID_SIZE, 0x00);
 	data[0] = 0;
 	memcpy(data.data() + 1, &pingID, 4);
-	memcpy(data.data() + 5, m_selfClientID, CLIENT_ID_SIZE);
+	memcpy(data.data() + 5, m_selfClientID.data(), CLIENT_ID_SIZE);
 	emit sendDhtPacket(data, ipport);
+	return 0;
+}
+
+int CDistributedHashTable::sendPingResoinses(IP_Port ip_port, quint32 ping_id)
+{
+	//[byte with value: 00 for request, 01 for response][random 4 byte (ping_id)][char array (client node_id), length=32 bytes]
+	//ping_id = a random integer, the response must contain the exact same number as the request
+	QByteArray data(5 + CLIENT_ID_SIZE,0x00);
+	data[0] = 1;
+	memcpy(data.data() + 1, &ping_id, 4);
+	memcpy(data.data() + 5, m_selfClientID.data(), CLIENT_ID_SIZE);
+	emit sendDhtPacket(data, ip_port);
 	return 0;
 }
 
@@ -215,6 +330,33 @@ int CDistributedHashTable::addPinging(IP_Port ipport)
 		}		
 	}
 	return 0;
+}
+
+void CDistributedHashTable::addtoLists(IP_Port ip_port, char* client_id)
+{
+	//NOTE: current behaviour if there are two clients with the same id is to only keep one (the first one)
+	if (!clientInList(m_closeClientlist, LCLIENT_LIST, client_id, ip_port))
+	{
+
+		if (replaceBadNode(m_closeClientlist, LCLIENT_LIST, client_id, ip_port))
+		{
+			//if we can't replace bad nodes we try replacing good ones
+			replaceGoodNode(m_closeClientlist, LCLIENT_LIST, client_id, ip_port, m_selfClientID.data());
+		}
+
+	}
+	for (int i = 0; i < m_numFriends; i++)
+	{
+		if (!clientInList(m_friendsList[i].client_list, MAX_FRIEND_CLIENTS, client_id, ip_port))
+		{
+
+			if (replaceBadNode(m_friendsList[i].client_list, MAX_FRIEND_CLIENTS, client_id, ip_port))
+			{
+				//if we can't replace bad nodes we try replacing good ones
+				replaceGoodNode(m_friendsList[i].client_list, MAX_FRIEND_CLIENTS, client_id, ip_port,m_selfClientID.data());
+			}
+		}
+	}
 }
 
 int CDistributedHashTable::getCloseNodes(const QByteArray& clientID, NodeFormat* nodeList)
@@ -277,9 +419,58 @@ bool CDistributedHashTable::clientInNodelist(const NodeFormat* list, const quint
 {
 	for (int i = 0; i < length; i++)
 	{
-		if (list[i].client_id == clientID)
+		if ( memcmp(list[i].client_id, clientID.data(), CLIENT_ID_SIZE) == 0)
 			return true;	
 	}	
+	return false;
+}
+
+bool CDistributedHashTable::clientInList(ClientData* list, uint32_t length, char* client_id, IP_Port ip_port)
+{	
+	for (int i = 0; i < length; i++)
+	{
+		//If the id for an ip/port changes, replace it.
+		if (list[i].ip_port.ip == ip_port.ip &&	list[i].ip_port.port == ip_port.port)	
+			memcpy(list[i].client_id, client_id, CLIENT_ID_SIZE);
+		
+		if(memcmp(list[i].client_id,client_id, CLIENT_ID_SIZE)==0)
+		{
+			//Refresh the client timestamp.
+			list[i].timestamp = CUtil::currentTime();
+			return true;
+		}
+	}	
+	return false;
+}
+
+bool CDistributedHashTable::replaceBadNode(ClientData* list, uint32_t length, char* client_id, IP_Port ip_port)
+{	
+	uint32_t temp_time = CUtil::currentTime();
+	for (int i = 0; i < length; i++)
+	{
+		if (temp_time -list[i].timestamp > BAD_NODE_TIMEOUT *1000)//if node is bad.
+		{
+			memcpy(list[i].client_id, client_id, CLIENT_ID_SIZE);
+			list[i].ip_port = ip_port;
+			list[i].timestamp = temp_time;
+			return true;
+		}
+	}
+	return false;
+}
+
+bool CDistributedHashTable::replaceGoodNode(ClientData* list, uint32_t length, char* client_id, IP_Port ip_port, char* comp_client_id)
+{
+	for (int i = 0; i < length; i++)
+	{
+		if ( idClosest(comp_client_id, list[i].client_id, client_id) == 2)
+		{
+			memcpy(list[i].client_id, client_id, CLIENT_ID_SIZE);
+			list[i].ip_port = ip_port;
+			list[i].timestamp = CUtil::currentTime();
+			return true;
+		}
+	}
 	return false;
 }
 
@@ -304,13 +495,13 @@ bool  CDistributedHashTable::onRecieveDhtPacket(QByteArray packet, IP_Port sourc
 	switch (packet[0])
 	{
 		case 0:
-			emit pingRequest(packet, source);
+			onPingRequest(packet, source);
 		case 1:
-			emit pingResponse(packet,  source);
+			onPingResponses(packet,  source);
 		case 2:
-			emit nodesRequest(packet, source);
+			onNodesRequest(packet, source);
 		case 3:
-			emit nodesResponses(packet, source);
+			onNodesResponses(packet, source);
 		default:
 			return false;
 	}
