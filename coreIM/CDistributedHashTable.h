@@ -112,7 +112,7 @@ private:
 	int sendPingResoinses(IP_Port ip_port, quint32 ping_id);
 
 	//看ipport在m_nodesRequestList列表中吗--is_gettingnodes
-	bool isSendNodesRequest(IP_Port ipport, quint32 pingID);
+	bool isSendedNodesRequest(IP_Port ipport, quint32 pingID);
 
 	//把一个新的Nodes请求的ipport添加到m_nodesRequestList中，并创建一个随机pingID----add_gettingnodes
 	//问题：如果都是有效的时间戳m_sendNodesList是满的则没有添加，怎么最优处理？

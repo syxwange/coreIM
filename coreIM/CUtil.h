@@ -8,7 +8,7 @@ public:
 	//返回毫秒级时间戳
 	static long long  currentTime();
 
-	//返回随便数字
+	//返回随机数字
 	static int randomInt(int n=0);
 };
 

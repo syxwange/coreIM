@@ -133,11 +133,11 @@ bool CDistributedHashTable::onNodesRequest(QByteArray packet, IP_Port source)
 {
 	if(packet.size()!= (5 + CLIENT_ID_SIZE * 2))
 		return false;
-	quint32 clientID=0;
-	memcpy(&clientID, packet.data() + 1, sizeof(clientID));
-	if (isSendNodesRequest({}, clientID))
+	quint32 pingID=0;
+	memcpy(&pingID, packet.data() + 1, sizeof(pingID));
+	if (isSendedNodesRequest({}, pingID))
 		return false;
-	sendNodeResponses(source, packet.replace(5, CLIENT_ID_SIZE), clientID);
+	sendNodeResponses(source, packet.replace(5, CLIENT_ID_SIZE), pingID);
 
 	sendPingRequest(source);
 	return true;
@@ -154,7 +154,7 @@ bool CDistributedHashTable::onNodesResponses(QByteArray packet, IP_Port source)
 	uint32_t ping_id;
 
 	memcpy(&ping_id, packet.data() + 1, 4);
-	if (!isSendNodesRequest(source, ping_id))
+	if (!isSendedNodesRequest(source, ping_id))
 		return false;
 
 	NodeFormat nodes_list[MAX_SENT_NODES]{};
@@ -207,7 +207,7 @@ bool CDistributedHashTable::onPingResponses(QByteArray packet, IP_Port source)
 
 int CDistributedHashTable::sendNodesRequest(IP_Port ipport, QByteArray clientID)
 {
-	if (isSendNodesRequest(ipport, 0))
+	if (isSendedNodesRequest(ipport, 0))
 		return -1;
 
 	int ping_id = addNodesRequest(ipport);
@@ -226,39 +226,38 @@ int CDistributedHashTable::sendNodesRequest(IP_Port ipport, QByteArray clientID)
 	return 0;
 }
 
-bool CDistributedHashTable::isSendNodesRequest(IP_Port ipport, quint32 pingID)
+bool CDistributedHashTable::isSendedNodesRequest(IP_Port ipport, quint32 pingID)
 {	
-	auto tempTime = CUtil::currentTime();
-	int pinging = 0;
+	auto tempTime = CUtil::currentTime();	
 	for (auto& node : m_nodesRequestList)
 	{
 		if (node.timestamp + PING_TIMEOUT*1000 > tempTime)
 		{
 			if (!ipport.ip.isNull() && node.ip_port.ip == ipport.ip && node.ip_port.port == ipport.port)
-				pinging++;
+				return true;
 			if (pingID != 0 && node.ping_id == pingID)
-				pinging++;
-			if (pinging == 0)
-				return false;
+				return true;
 		}
 	}	
-	return true;
+	return false;
 }
 
 int CDistributedHashTable::addNodesRequest(IP_Port ipport)
 {
-	auto tempTime = CUtil::currentTime();
-	auto pingID= CUtil::randomInt();
-	for (auto& node : m_nodesRequestList)
+	auto tempTime = CUtil::currentTime();	
+	for (int i = 0; i < PING_TIMEOUT; i++)
 	{
-		if (tempTime-node.timestamp>PING_TIMEOUT*1000)
+		for (auto& node : m_nodesRequestList)
 		{
-			node.ip_port = ipport;
-			node.ping_id = pingID;
-			node.timestamp = tempTime;
-			return pingID;
+			if (tempTime - node.timestamp > (PING_TIMEOUT-i)* 1000)
+			{
+				node.ip_port = ipport;
+				node.ping_id = CUtil::randomInt();
+				node.timestamp = tempTime;
+				return node.ping_id;
+			}
 		}
-	}
+	}	
 	return 0;
 }
 
@@ -510,24 +509,19 @@ bool  CDistributedHashTable::onRecieveDhtPacket(QByteArray packet, IP_Port sourc
 
 bool CDistributedHashTable::isPinging(IP_Port ipport, uint32_t pingID)
 {
-	uint8_t pinging=0;
 	auto tempTime = CUtil::currentTime();
-
 	for (auto& pings : m_pingsList)
 	{
-		if (tempTime - pings.timestamp > PING_TIMEOUT * 1000)
+		if (tempTime - pings.timestamp < PING_TIMEOUT * 1000)
 		{
-			if (!ipport.ip.isNull()&&pings.ip_port.ip==ipport.ip&&pings.ip_port.port==ipport.port)			
-				pinging++;
+			if (!ipport.ip.isNull() && pings.ip_port.ip == ipport.ip && pings.ip_port.port == ipport.port)
+				return true;
 
 			if (pingID != 0&&pings.ping_id==pingID)
-				pinging++;
-
-			if (pinging == (pingID != 0) + !ipport.ip.isNull())
-				return false;
+				return true;
 		}
 	}
-	return true;
+	return false;
 }
 
 
