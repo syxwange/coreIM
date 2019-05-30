@@ -3,6 +3,7 @@
 #include <QtWidgets/QMainWindow>
 #include "ui_mainwindow.h"
 
+class CCoreIM;
 class MainWindow : public QMainWindow
 {
 	Q_OBJECT
@@ -12,4 +13,5 @@ public:
 
 private:
 	Ui::MainWindowClass ui;
+	CCoreIM* m_pCore{ nullptr };
 };

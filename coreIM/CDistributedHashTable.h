@@ -76,6 +76,8 @@ public:
 	//从ipport机器的客户端引当前机器导客户端，发送一个 get nodes请求给位于ipport机器的客户端，并把自己ID发送给ipport机器的客户端
 	void bootstrap(IP_Port ipport);
 
+
+	void setClientID(QByteArray id) { m_selfClientID = id; }
 signals:
 	//发送一个DHT包
 	void sendDhtPacket(QByteArray, IP_Port);
