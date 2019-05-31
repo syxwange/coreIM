@@ -21,7 +21,7 @@ CCoreIM* CCoreIM::getInstance()
 	return m_pCoreIM;
 }
 
-void CCoreIM:: ()
+void CCoreIM::start()
 {
 	moveToThread(m_pThread);
 	m_pThread->start();
