@@ -74,7 +74,7 @@ public:
 	void doFriends();
 
 	//从ipport机器的客户端引当前机器导客户端，发送一个 get nodes请求给位于ipport机器的客户端，并把自己ID发送给ipport机器的客户端
-	void bootstrap(IP_Port ipport);
+	bool bootstrap(IP_Port ipport);
 
 
 	void setClientID(QByteArray id) { m_selfClientID = id; }
@@ -100,7 +100,7 @@ public slots:
 
 private:
 	//向ipport的机器ID为clientID客户端发送一个Node请求,成功返回0，不成功返回-1 ---getnodes
-	int sendNodesRequest(IP_Port ipport, QByteArray clientID);
+	bool sendNodesRequest(IP_Port ipport, QByteArray clientID);
 
 	//为收到的nodes请求发送一个响应。---sendnodes
 	int sendNodeResponses(IP_Port ipport, QByteArray clientID, quint32 pingID);

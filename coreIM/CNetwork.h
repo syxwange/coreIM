@@ -41,3 +41,5 @@ signals:
 private:
 	QUdpSocket *m_pUdpSocket;
 };
+
+Q_DECLARE_METATYPE(IP_Port)

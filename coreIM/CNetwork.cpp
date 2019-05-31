@@ -1,8 +1,10 @@
 #include "CNetwork.h"
 #include <qnetworkdatagram.h>
+#include <qdebug.h>
 
-CNetwork::CNetwork(QObject *parent)	: QObject(parent),m_pUdpSocket(new QUdpSocket)
+CNetwork::CNetwork(QObject *parent)	: QObject(parent),m_pUdpSocket(new QUdpSocket(this))
 {
+	qRegisterMetaType<IP_Port>("IP_Port");
 }
 
 CNetwork::~CNetwork()
@@ -13,6 +15,9 @@ CNetwork::~CNetwork()
 
 int CNetwork::sendPacket(const QByteArray& msg,const  IP_Port& ipport)
 {
+	auto ret = m_pUdpSocket->isValid();
+	if (!ret)
+		qDebug() << "udp is busing";
 	return m_pUdpSocket->writeDatagram(msg, ipport.ip,ipport.port);
 	
 }

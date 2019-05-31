@@ -124,9 +124,9 @@ void CDistributedHashTable::doFriends()
 	}
 }
 
-void CDistributedHashTable::bootstrap(IP_Port ipport)
+bool CDistributedHashTable::bootstrap(IP_Port ipport)
 {
-	sendNodesRequest(ipport, m_selfClientID);
+	return sendNodesRequest(ipport, m_selfClientID);
 }
 
 bool CDistributedHashTable::onNodesRequest(QByteArray packet, IP_Port source)
@@ -205,15 +205,15 @@ bool CDistributedHashTable::onPingResponses(QByteArray packet, IP_Port source)
 	return false;
 }
 
-int CDistributedHashTable::sendNodesRequest(IP_Port ipport, QByteArray clientID)
+bool CDistributedHashTable::sendNodesRequest(IP_Port ipport, QByteArray clientID)
 {
 	if (isSendedNodesRequest(ipport, 0))
-		return -1;
+		return false;
 
 	int ping_id = addNodesRequest(ipport);
 
 	if (ping_id == 0)
-		return -1;
+		return false;
 
 	QByteArray dataTemp(5 + CLIENT_ID_SIZE * 2, 0x00);	
 	//NodesRequest请求，格式是 [byte with value: 02][random 4 byte (ping_id)][char array (自己的ID), length=32 bytes]
@@ -223,7 +223,7 @@ int CDistributedHashTable::sendNodesRequest(IP_Port ipport, QByteArray clientID)
 	memcpy(dataTemp.data() + 1 +sizeof(ping_id), m_selfClientID, CLIENT_ID_SIZE);
 	memcpy(dataTemp.data() + 1 + sizeof(ping_id) + CLIENT_ID_SIZE, clientID, CLIENT_ID_SIZE);
 	emit sendDhtPacket(dataTemp,ipport);
-	return 0;
+	return true;
 }
 
 bool CDistributedHashTable::isSendedNodesRequest(IP_Port ipport, quint32 pingID)
@@ -495,12 +495,16 @@ bool  CDistributedHashTable::onRecieveDhtPacket(QByteArray packet, IP_Port sourc
 	{
 		case 0:
 			onPingRequest(packet, source);
+			break;
 		case 1:
 			onPingResponses(packet,  source);
+			break;
 		case 2:
 			onNodesRequest(packet, source);
+			break;
 		case 3:
 			onNodesResponses(packet, source);
+			break;
 		default:
 			return false;
 	}
